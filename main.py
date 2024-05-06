@@ -1,15 +1,16 @@
 from fastapi import FastAPI,HTTPException,Depends
 from datetime import timedelta
 from models import SessionLocal,User,Product
-from pydatic_models import UserCreate,UserLogin,ProductCreate
+from pydatic_models import UserCreate, UserLogin, ProductCreate, UserOut, ProductBase, ProductUpdate, ProductUpdateOut
 from fastapi.middleware.cors import CORSMiddleware
-from Auth import pwd_context,authenticate_user,create_access_token,ACCESS_TOKEN_EXPIRE_MINUTES,get_current_user
+from auth import pwd_context,authenticate_user,create_access_token,ACCESS_TOKEN_EXPIRE_MINUTES,get_current_user
 
 app=FastAPI()
 
 origins=[
     "http://localhost:5173"
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -19,7 +20,8 @@ app.add_middleware(
 )
 db = SessionLocal()
 
-@app.post("/users/")
+
+@app.post("/register" ,response_model=UserOut)
 def create_user(user: UserCreate):
     if db.query(User).filter(User.username == user.username).first():
         raise HTTPException(
@@ -33,7 +35,7 @@ def create_user(user: UserCreate):
     return db_user
 
 
-@app.post("/login/")
+@app.post("/login")
 def login(user: UserLogin):
     db_user = authenticate_user(user.username, user.password)
     if not db_user:
@@ -45,7 +47,18 @@ def login(user: UserLogin):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.post("/products/")
+
+
+
+@app.get("/products")
+def get_products(current_user: User = Depends(get_current_user)):
+    products = db.query(Product).filter(
+        Product.user_id == current_user.id).all()
+    db.close()
+    return products
+
+
+@app.post("/products")
 def create_product(product: ProductCreate, current_user: User = Depends(get_current_user)):
     db_product = Product(**product.model_dump(), user_id=current_user.id)
     db.add(db_product)
@@ -54,20 +67,30 @@ def create_product(product: ProductCreate, current_user: User = Depends(get_curr
     db.close()
     return db_product
 
+@app.put("/products/{pid}")
+async def update_item(pid: int, product: ProductUpdate, response_model=Product):
+    prod=db.query(Product).filter(Product.id==pid).first()
+    if not prod :
+        raise HTTPException(status_code=404,detail="product does not exist")
 
-@app.get("/products/")
-def get_products(current_user: User = Depends(get_current_user)):
-    products = db.query(Product).filter(
-        Product.user_id == current_user.id).all()
-    db.close()
-    return products
+    if not prod.name == product.name and product.name != None:
+        prod.name = product.name
 
-@app.get("/users/")
+    if not prod.cost == product.cost and product.cost != None:
+        prod.cost = product.cost
+    
+    if not prod.price == product.price and product.price != None:
+        prod.price = product.price
+    
+    if not prod.stock_quantity == product.stock_quantity and product.stock_quantity != None:
+        prod.stock_quantity = product.stock_quantity
+    db.commit()
+
+    prod = db.query(Product).filter(Product.id == pid).first()
+    return prod
+
+@app.get("/users")
 def get_all_users():
     users = db.query(User).all()
     db.close()
     return users
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000) 
