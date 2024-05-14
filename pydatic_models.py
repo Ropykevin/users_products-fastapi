@@ -42,3 +42,33 @@ class Product(ProductBase):
 
     class Config:
         orm_mode = True
+
+
+class SaleBase(BaseModel):
+    quantity: int
+    pid:int
+
+
+class SaleCreate(SaleBase):
+    pid: int
+
+class SaleOut(SaleCreate):
+    pass
+
+class SaleUpdate(BaseModel):
+    quantity: int | None = None
+    pid:int | None = None
+
+
+class SaleUpdateOut(SaleUpdate):
+    id :int
+    total_price:int
+
+
+class Sale(SaleBase):
+    id: int
+    total_price: float
+    product_id: int
+
+    class Config:
+        orm_mode = True

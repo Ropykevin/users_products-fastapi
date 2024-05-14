@@ -34,6 +34,19 @@ class Product(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     user = relationship("User", back_populates="products")
+    sales=relationship("Sale",back_populates="product")
 
+
+class Sale(Base):
+    __tablename__ = "sales"
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    total_price = Column(Float)
+    sold_at = Column(
+        DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+
+    product = relationship("Product", back_populates="sales")
 
 Base.metadata.create_all(bind=engine)
