@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 
 class UserOut(BaseModel):
@@ -50,10 +51,17 @@ class SaleBase(BaseModel):
 
 
 class SaleCreate(SaleBase):
-    pid: int
-
-class SaleOut(SaleCreate):
     pass
+
+
+class SaleOut(SaleBase):
+    total_price: float
+    sold_at: datetime
+    product_id: int
+
+    class Config:
+        orm_mode = True
+
 
 class SaleUpdate(BaseModel):
     quantity: int | None = None

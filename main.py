@@ -8,6 +8,7 @@ from sqlalchemy import func
 from fastapi.middleware.cors import CORSMiddleware
 from auth import pwd_context,authenticate_user,create_access_token,ACCESS_TOKEN_EXPIRE_MINUTES,get_current_user
 import pytz
+
 app=FastAPI()
 
 origins=[
@@ -125,13 +126,22 @@ def make_sale(sale: SaleCreate, current_user: User = Depends(get_current_user)):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    if product.stock_quantity < sale.quantity:
+        raise HTTPException(
+            status_code=400, detail="Insufficient stock quantity")
+
     total_price = product.price * sale.quantity
+
+    product.stock_quantity -= sale.quantity
+
     db_sale = Sale(quantity=sale.quantity,
-                        total_price=total_price, product_id=sale.pid)
+                   total_price=total_price, product_id=sale.pid)
     db.add(db_sale)
+
     db.commit()
     db.refresh(db_sale)
 
+    return db_sale
 
 # update sale 
 
@@ -156,7 +166,7 @@ def sales_per_day(current_user: User = Depends(get_current_user)):
     today = datetime.now(pytz.utc).replace(
         hour=0, minute=0, second=0, microsecond=0)
     sales = (
-        SessionLocal().query(func.date(Sale.sold_at), func.count(Sale.id))
+        SessionLocal().query(func.date(Sale.sold_at), func.sum(Sale.quantity*Product.price))
         .filter(Sale.product.has(user_id=current_user.id), Sale.sold_at >= today)
         .group_by(func.date(Sale.sold_at))
         .all()
@@ -177,7 +187,7 @@ def profit_per_day(current_user: User = Depends(get_current_user)):
         .group_by(func.date(Sale.sold_at))
         .all()
     )
-    dates = [sale[0].isoformat() for sale in sales]
+    dates = [sale[0] for sale in sales]
     profits = [sale[1] for sale in sales]
     return {"data": [{"x": dates, "y": profits, "type": "line", "name": "Profit per Day"}]}
 
@@ -213,6 +223,7 @@ def profit_per_product(current_user: User = Depends(get_current_user)):
 
 
 if __name__ == "__main__":
-    config = uvicorn.Config("main:app", port=8000, log_level="info")
+    config = uvicorn.Config("main:app", port=8000,
+                            log_level="info", reload=True)
     server = uvicorn.Server(config)
     server.run()
